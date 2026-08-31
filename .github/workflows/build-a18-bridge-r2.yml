@@ -1,0 +1,61 @@
+name: Build A18 Bridge R2 Shortcut
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - tools/shortcuts/build_a18_bridge_r2.py
+      - .github/workflows/build-a18-bridge-r2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-sign-publish:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build deterministic unsigned Shortcut
+        run: |
+          mkdir -p build
+          python3 tools/shortcuts/build_a18_bridge_r2.py --output build/A18-Bridge-R2-unsigned.shortcut
+          plutil -lint build/A18-Bridge-R2-unsigned.shortcut
+          shasum -a 256 build/A18-Bridge-R2-unsigned.shortcut
+
+      - name: Sign with Apple Shortcuts CLI
+        run: |
+          shortcuts sign --mode anyone --input build/A18-Bridge-R2-unsigned.shortcut --output build/A18-Bridge-R2.shortcut
+          test -s build/A18-Bridge-R2.shortcut
+          file build/A18-Bridge-R2.shortcut
+          shasum -a 256 build/A18-Bridge-R2.shortcut | tee build/A18-Bridge-R2.sha256
+
+      - name: Upload signed package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: A18-Bridge-R2-signed
+          path: |
+            build/A18-Bridge-R2.shortcut
+            build/A18-Bridge-R2.sha256
+          if-no-files-found: error
+
+      - name: Publish signed package into R7 field probe
+        run: |
+          mkdir -p dist
+          cp build/A18-Bridge-R2.shortcut dist/A18-Bridge-R2.shortcut
+          cp build/A18-Bridge-R2.sha256 dist/A18-Bridge-R2.sha256
+          git config user.name "a18-shortcut-builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add dist/A18-Bridge-R2.shortcut dist/A18-Bridge-R2.sha256
+          if git diff --cached --quiet; then
+            echo "Signed package unchanged."
+            exit 0
+          fi
+          git commit -m "Publish signed A18 Bridge R2 shortcut [skip ci]"
+          git push origin HEAD:$GITHUB_REF_NAME
