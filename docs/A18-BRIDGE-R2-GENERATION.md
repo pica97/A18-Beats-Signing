@@ -13,3 +13,6 @@ A macOS GitHub Actions job signs it with Apple's official shortcuts sign --mode 
 The signed file is published to dist/A18-Bridge-R2.shortcut.
 
 Apple still requires the user to confirm Add Shortcut when importing a signed Shortcut. Silent installation is not possible.
+
+
+Signing channel initialized on public satellite repository.
